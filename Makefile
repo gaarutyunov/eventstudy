@@ -12,8 +12,7 @@ install: ## Install dependencies
 
 .PHONY: build
 build: ## Build the project
-	pkger; \
-	go build -o $(BUILD)/$(PROJECT_NAME) $(CURDIR)/cmd/main.go
+	go build -o $(BUILD)/$(PROJECT_NAME) $(CURDIR)/cmd/$(PROJECT_NAME)/$(PROJECT_NAME).go
 
 .PHONY: clean
 clean: ## Clean project

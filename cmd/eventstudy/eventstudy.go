@@ -7,7 +7,6 @@ import (
 	sdk "github.com/TinkoffCreditSystems/invest-openapi-go-sdk"
 	"github.com/gaarutyunov/eventstudy/internal/candle"
 	"github.com/gaarutyunov/eventstudy/internal/instrument"
-	"github.com/spf13/viper"
 	"go.uber.org/ratelimit"
 	"log"
 	"time"
@@ -19,15 +18,28 @@ var rf = flag.Float64("rf", 0.045, "risk free rate")
 var from = flag.String("from", "2019-01-01", "starting date")
 var to = flag.String("to", "2020-10-04", "ending date")
 var event = flag.String("event", "2020-03-06", "event date")
-var window = flag.Int("window", 50, "rolling window")
-var period = flag.Int("period", 50, "period of estimation")
+var window = flag.Int("window", 30, "rolling window")
+var eventWindow = flag.Duration("eventWindow", time.Hour * 24 * 30, "event window")
+var period = flag.Int("period", 30, "period of estimation")
 var del = flag.String("delimiter", ",", "delimiter for output file")
 var output = flag.String("out", "out/returns.csv", "output file")
+var help = flag.Bool("h", false, "help")
+var key = flag.String("apiKey", "", "api key")
 
 const dateLayout = "2006-01-02"
 
 func main() {
+	flag.Usage = usage
 	flag.Parse()
+
+	if *help {
+		flag.Usage()
+		return
+	}
+
+	if len(*key) == 0 {
+		log.Fatalln("Provide api key for Tinkoff Open API")
+	}
 
 	fromDate, err := time.Parse(dateLayout, *from)
 
@@ -51,15 +63,7 @@ func main() {
 
 	dates(fromDate, toDate, &d)
 
-	viper.AddConfigPath(".")
-	viper.SetConfigName("config")
-	viper.SetConfigType("yml")
-
-	if err := viper.ReadInConfig(); err != nil {
-		log.Fatalf("error reading config: %v", err)
-	}
-
-	client := sdk.NewSandboxRestClient(viper.GetString("api.token"))
+	client := sdk.NewSandboxRestClient(*key)
 
 	i := &instrument.Instrument{
 		Ticker:  ticker,
@@ -85,7 +89,7 @@ func main() {
 
 	rm.CalculateReturns()
 	err = i.CalculateReturns().
-		Capm(fromDate, eventDate.Add(-time.Hour * 24), rm).
+		Capm(fromDate, eventDate.Add(-(*eventWindow)), rm).
 		EstimateReturns(*window, *period, *rf).
 		CalculateAbnormalReturns().
 		ToCsv(*output, &[]rune(*del)[0])
@@ -163,4 +167,11 @@ func dates(from, to time.Time, out *[][]time.Time) {
 	dates(nFrom, to, out)
 
 	return
+}
+
+func usage() {
+	fmt.Println("Usage of eventstudy:")
+	fmt.Println()
+
+	flag.PrintDefaults()
 }
